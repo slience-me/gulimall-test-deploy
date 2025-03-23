@@ -17,30 +17,72 @@ pipeline {
 
       }
     }
-    stage ('构建镜像 & 推送镜像') {
-            steps {
-                container ('maven') {
-                    sh 'mvn -Dmaven.test.skip=true -gs `pwd`/mvn-settings.xml clean package'
-                    sh 'cd $PROJECT_NAME && docker build -f Dockerfile -t $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER .'
-                    withCredentials([usernamePassword(passwordVariable : 'DOCKER_PASSWORD' ,usernameVariable : 'DOCKER_USERNAME' ,credentialsId : "$DOCKER_CREDENTIAL_ID" ,)]) {
-                        sh 'echo "$DOCKER_PASSWORD" | docker login $REGISTRY -u "$DOCKER_USERNAME" --password-stdin'
-                        sh 'docker push $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER'
-                    }
-                }
-            }
+
+    stage('构建镜像 & 推送镜像') {
+      steps {
+        container('maven') {
+          sh 'mvn -Dmaven.test.skip=true -gs `pwd`/mvn-settings.xml clean package'
+          sh 'cd $PROJECT_NAME && docker build -f Dockerfile -t $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER .'
+          withCredentials([usernamePassword(passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME', credentialsId: "$DOCKER_CREDENTIAL_ID")]) {
+            sh 'echo "$DOCKER_PASSWORD" | docker login $REGISTRY -u "$DOCKER_USERNAME" --password-stdin'
+            sh 'docker push $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER'
+          }
+
         }
 
-        stage('推送最新版镜像'){
-           when{
-             branch 'master'
-           }
-           steps{
-                container ('maven') {
-                  sh 'docker tag $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:latest '
-                  sh 'docker push $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:latest '
-                }
-           }
+      }
+    }
+
+    stage('推送最新版镜像') {
+      when {
+        branch 'master'
+      }
+      steps {
+        container('maven') {
+          sh 'docker tag $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:latest'
+          sh 'docker push $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:latest'
         }
+
+      }
+    }
+
+    stage('部署到K8S') {
+      agent none
+      steps {
+        input(id: 'deploy-to-dev-$PROJECT_NAME', message: '是否部署到集群中?')
+        container('maven') {
+          withCredentials([kubeconfigContent(credentialsId: 'demo-kubeconfig', variable: 'KUBECONFIG_CONTENT')]) {
+            sh 'envsubst < deploy/deploy.yaml | kubectl apply -f -'
+          }
+          mail(to: 'slience_me@foxmail.com', cc: '', subject: 'k8s邮件测试', body: '123')
+        }
+
+      }
+    }
+
+    stage('发布版本') {
+      when {
+        expression {
+          return params.PROJECT_VERSION =~ /v.*/
+        }
+
+      }
+      steps {
+        container('maven') {
+          input(id: 'release-image-with-tag', message: '发布当前版本镜像吗?')
+          withCredentials([usernamePassword(credentialsId: "$GITEE_CREDENTIAL_ID", passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
+            sh 'git config --global user.email "slienceme.cn@gmail.com"'
+            sh 'git config --global user.name "slience_me"'
+            sh 'git tag -a $PROJECT_VERSION -m "$PROJECT_VERSION"'
+            sh 'git push http://$GIT_USERNAME:$GIT_PASSWORD@gitee.com/$GITEE_ACCOUNT/gulimall.git --tags --ipv4'
+          }
+
+          sh 'docker tag $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:$PROJECT_VERSION'
+          sh 'docker push $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:$PROJECT_VERSION'
+        }
+
+      }
+    }
 
   }
   environment {
@@ -49,7 +91,7 @@ pipeline {
     KUBECONFIG_CREDENTIAL_ID = 'demo-kubeconfig'
     REGISTRY = 'docker.io'
     DOCKERHUB_NAMESPACE = 'sliencemehub'
-    GITEE_ACCOUNT = 'slience_me'
+    GITEE_ACCOUNT = 'slienceme'
     BRANCH_NAME = 'master'
   }
   parameters {
