@@ -24,17 +24,4 @@
 		<module>gulimall-cart</module>
 		<module>gulimall-seckill</module>
     </modules>
-
-	<build>
-		<pluginManagement>
-			<plugins>
-				<plugin>
-					<groupId>org.sonarsource.scanner.maven</groupId>
-					<artifactId>sonar-maven-plugin</artifactId>
-					<version>3.7.0.1746</version> <!-- 使用兼容的版本 -->
-				</plugin>
-			</plugins>
-		</pluginManagement>
-	</build>
-
 </project>
