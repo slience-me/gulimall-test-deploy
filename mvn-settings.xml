@@ -1,8 +1,25 @@
 <settings>
-    <mirror>
-        <id>aliyunmaven</id>
-        <mirrorOf>*</mirrorOf>
-        <name>阿里云公共仓库</name>
-        <url>https://maven.aliyun.com/repository/public</url>
-    </mirror>
+    <mirrors>
+        <mirror>
+            <id>repo.jenkins-ci.org</id>
+            <url>https://repo.jenkins-ci.org/public/</url>
+            <mirrorOf>m.g.o-public</mirrorOf>
+        </mirror>
+    </mirrors>
+    <profiles>
+        <!-- java版本 -->
+        <profile>
+            <id>jdk-1.8</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+                <jdk>1.8</jdk>
+            </activation>
+
+            <properties>
+                <maven.compiler.source>1.8</maven.compiler.source>
+                <maven.compiler.target>1.8</maven.compiler.target>
+                <maven.compiler.compilerVersion>1.8</maven.compiler.compilerVersion>
+            </properties>
+        </profile>
+    </profiles>
 </settings>
