@@ -5,34 +5,55 @@ pipeline {
     }
 
   }
-
-  parameters {
-      string(name: 'PROJECT_VERSION', defaultValue: 'v0.0Beta', description: '版本号')
-      string(name: 'PROJECT_NAME', defaultValue: '', description: '')
-  }
-
-  environment {
-          DOCKER_CREDENTIAL_ID = 'dockerhub-id'
-          GITEE_CREDENTIAL_ID = 'gitee-id'
-          KUBECONFIG_CREDENTIAL_ID = 'demo-kubeconfig'
-          REGISTRY = 'docker.io'
-          DOCKERHUB_NAMESPACE = 'sliencemehub'
-          GITEE_ACCOUNT = 'slience_me'
-  }
-
   stages {
     stage('拉取代码') {
-      agent {
-        node {
-          label 'maven'
+      agent none
+      steps {
+        git(url: 'https://gitee.com/slienceme/gulimall.git', credentialsId: 'gitee-id', branch: 'master', changelog: true, poll: false)
+        sh 'echo 正在构建 $PROJECT_NAME 版本号 $PROJECT_VERSION 将会提交给 $REGISTRY 镜像仓库'
+        container('maven') {
+          sh 'mvn clean install -Dmaven.test.skip=true -gs `pwd`/mvn-settings.xml'
         }
 
       }
-      steps {
-        git(url: 'https://gitee.com/slienceme/gulimall.git', credentialsId: 'gitee-id', branch: 'master', changelog: true, poll: false)
-        sh 'echo 正在构建 $PROJECT_NAME 版本号 $PROJECT_VERSION'
-      }
     }
+    stage ('构建镜像 & 推送镜像') {
+            steps {
+                container ('maven') {
+                    sh 'mvn -Dmaven.test.skip=true -gs `pwd`/mvn-settings.xml clean package'
+                    sh 'cd $PROJECT_NAME && docker build -f Dockerfile -t $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER .'
+                    withCredentials([usernamePassword(passwordVariable : 'DOCKER_PASSWORD' ,usernameVariable : 'DOCKER_USERNAME' ,credentialsId : "$DOCKER_CREDENTIAL_ID" ,)]) {
+                        sh 'echo "$DOCKER_PASSWORD" | docker login $REGISTRY -u "$DOCKER_USERNAME" --password-stdin'
+                        sh 'docker push $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER'
+                    }
+                }
+            }
+        }
 
+        stage('推送最新版镜像'){
+           when{
+             branch 'master'
+           }
+           steps{
+                container ('maven') {
+                  sh 'docker tag $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:latest '
+                  sh 'docker push $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:latest '
+                }
+           }
+        }
+
+  }
+  environment {
+    DOCKER_CREDENTIAL_ID = 'dockerhub-id'
+    GITEE_CREDENTIAL_ID = 'gitee-id'
+    KUBECONFIG_CREDENTIAL_ID = 'demo-kubeconfig'
+    REGISTRY = 'docker.io'
+    DOCKERHUB_NAMESPACE = 'sliencemehub'
+    GITEE_ACCOUNT = 'slience_me'
+    BRANCH_NAME = 'master'
+  }
+  parameters {
+    string(name: 'PROJECT_VERSION', defaultValue: 'v0.0Beta', description: '版本号')
+    string(name: 'PROJECT_NAME', defaultValue: '', description: '')
   }
 }
