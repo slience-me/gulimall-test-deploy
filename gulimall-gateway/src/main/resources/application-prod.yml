@@ -85,4 +85,3 @@ spring:
           uri: lb://gulimall-seckill
           predicates:
             - Host=seckill.gulimall.com
-## 前端项目 统一带 /api前缀
