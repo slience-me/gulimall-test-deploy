@@ -50,15 +50,20 @@ pipeline {
       agent none
       steps {
         input(id: 'deploy-to-dev-$PROJECT_NAME', message: '是否部署到集群中?')
-        sh 'echo Local Path :  `pwd`'
-        sh 'echo Local Dir: `ls`'
-        sh 'echo Local Path :  `pwd`'
-        sh 'cd $PROJECT_NAME && pwd && ls'
-        sh 'PATH:  `pwd`/$PROJECT_NAME/deploy/deploy.yaml'
         container('maven') {
-            kubernetesDeploy(configs: '`pwd`/$PROJECT_NAME/deploy/deploy.yaml', enableConfigSubstitution: true,
-            kubeconfigId: "$KUBECONFIG_CREDENTIAL_ID")
+          withCredentials([kubeconfigContent(credentialsId: 'demo-kubeconfig', variable: 'KUBECONFIG_CONTENT')]) {
+            sh 'mkdir ~/.kube'
+            sh 'echo "$KUBECONFIG_CONTENT" > ~/.kube/config'
+
+            // 输出替换后的部署文件检查问题
+            sh 'envsubst < $PROJECT_NAME/deploy/deploy.yaml > /tmp/deploy.yaml'
+            sh 'cat /tmp/deploy.yaml' // 检查替换后的内容
+
+            sh 'envsubst < $PROJECT_NAME/deploy/deploy.yaml | kubectl apply -f -'
+          }
+
         }
+
       }
     }
 
