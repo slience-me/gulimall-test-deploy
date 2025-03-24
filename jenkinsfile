@@ -9,7 +9,7 @@ pipeline {
     stage('拉取代码') {
       agent none
       steps {
-        git(url: 'https://gitee.com/slienceme/gulimall.git', credentialsId: 'gitee-id', branch: 'master', changelog: true, poll: false)
+        git(url: 'https://github.com/slience-me/gulimall-test-deploy.git', credentialsId: 'github-id', branch: 'master', changelog: true, poll: false)
         sh 'echo 正在构建 $PROJECT_NAME 版本号 $PROJECT_VERSION 将会提交给 $REGISTRY 镜像仓库'
         container('maven') {
           sh 'mvn clean install -Dmaven.test.skip=true -gs `pwd`/mvn-settings.xml'
@@ -72,11 +72,11 @@ pipeline {
       steps {
         container('maven') {
           input(id: 'release-image-with-tag', message: '发布当前版本镜像吗?')
-          withCredentials([usernamePassword(credentialsId: "$GITEE_CREDENTIAL_ID", passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
+          withCredentials([usernamePassword(credentialsId: "$GITHUB_CREDENTIAL_ID", passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
             sh 'git config --global user.email "slienceme.cn@gmail.com"'
             sh 'git config --global user.name "slience_me"'
             sh 'git tag -a $PROJECT_VERSION -m "$PROJECT_VERSION"'
-            sh 'git push http://$GIT_USERNAME:$GIT_PASSWORD@gitee.com/$GITEE_ACCOUNT/gulimall.git --tags --ipv4'
+            sh 'git push https://$GIT_USERNAME:$GIT_PASSWORD@github.com/$GITHUB_ACCOUNT/gulimall-test-deploy.git --tags --ipv4'
           }
           sh 'docker tag $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:$PROJECT_VERSION'
           sh 'docker push $REGISTRY/$DOCKERHUB_NAMESPACE/$PROJECT_NAME:$PROJECT_VERSION'
@@ -88,11 +88,11 @@ pipeline {
   }
   environment {
     DOCKER_CREDENTIAL_ID = 'dockerhub-id'
-    GITEE_CREDENTIAL_ID = 'gitee-id'
+    GITHUB_CREDENTIAL_ID = 'github-id'
     KUBECONFIG_CREDENTIAL_ID = 'demo-kubeconfig'
     REGISTRY = 'docker.io'
     DOCKERHUB_NAMESPACE = 'sliencemehub'
-    GITEE_ACCOUNT = 'slienceme'
+    GITHUB_ACCOUNT = 'slience-me'
     BRANCH_NAME = 'master'
   }
   parameters {
