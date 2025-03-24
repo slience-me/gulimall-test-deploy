@@ -50,13 +50,15 @@ pipeline {
       agent none
       steps {
         input(id: 'deploy-to-dev-$PROJECT_NAME', message: '是否部署到集群中?')
+        sh 'echo Local Path :  `pwd`'
+        sh 'echo Local Dir: `ls`'
+        sh 'echo Local Path :  `pwd`'
+        sh 'cd $PROJECT_NAME && pwd && ls'
+        sh 'PATH:  `pwd`/$PROJECT_NAME/deploy/deploy.yaml'
         container('maven') {
-          withCredentials([kubeconfigContent(credentialsId: 'demo-kubeconfig', variable: 'KUBECONFIG_CONTENT')]) {
-            sh 'envsubst < deploy/deploy.yaml | kubectl apply -f -'
-          }
-          mail(to: 'slience_me@foxmail.com', cc: '', subject: 'k8s邮件测试', body: '123')
+            kubernetesDeploy(configs: '`pwd`/$PROJECT_NAME/deploy/deploy.yaml', enableConfigSubstitution: true,
+            kubeconfigId: "$KUBECONFIG_CREDENTIAL_ID")
         }
-
       }
     }
 
