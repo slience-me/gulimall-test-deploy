@@ -45,7 +45,7 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: sentinel-service
+  name: gulimall-ware
   namespace: gulimall
   labels:
     app: gulimall-ware
@@ -55,7 +55,7 @@ spec:
       protocol: TCP
       port: 8080
       targetPort: 8080
-      nodePort: 20011
+      nodePort: 30011
   selector:
     app: gulimall-ware
   type: NodePort
